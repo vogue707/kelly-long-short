@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>롱/숏 Kelly 공식 기반 주식 비중 계산기</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #ffffff;
+      --soft: #f8fafc;
+      --line: #e5e7eb;
+      --muted: #64748b;
+      --text: #0f172a;
+      --accent: #2563eb;
+      --long: #059669;
+      --short: #dc2626;
+      --neutral: #d97706;
+      --violet: #7c3aed;
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #334155 100%);
+    }
+
+    .hero {
+      color: white;
+      padding: 38px 20px 26px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 44px);
+      line-height: 1.08;
+      letter-spacing: -0.045em;
+    }
+
+    .hero p {
+      margin: 14px auto 0;
+      max-width: 980px;
+      color: #cbd5e1;
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    .container {
+      width: min(1280px, calc(100% - 32px));
+      margin: 0 auto 44px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 430px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-header p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .panel-body { padding: 18px 20px 20px; }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 12px 12px;
+      font-size: 15px;
+      outline: none;
+      background: #fff;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .toggle input { width: auto; }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 13px 16px;
+      font-weight: 900;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: #f1f5f9;
+      color: #0f172a;
+      box-shadow: none;
+      border: 1px solid #cbd5e1;
+    }
+
+    .notice {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #78350f;
+      font-size: 13px;
+      line-height: 1.62;
+    }
+
+    .blue-note {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1e3a8a;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 15px 15px;
+      background: #fff;
+      min-height: 108px;
+    }
+
+    .metric.highlight {
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+      border-color: #bfdbfe;
+    }
+
+    .metric .name {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .metric .value {
+      margin-top: 9px;
+      font-size: clamp(22px, 2.25vw, 34px);
+      font-weight: 950;
+      line-height: 1.08;
+      letter-spacing: -0.045em;
+    }
+
+    .metric .desc {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .long .value { color: var(--long); }
+    .short .value { color: var(--short); }
+    .neutral .value { color: var(--neutral); }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .pill.longp { color: var(--long); border-color: #bbf7d0; background: #f0fdf4; }
+    .pill.shortp { color: var(--short); border-color: #fecaca; background: #fef2f2; }
+    .pill.neutralp { color: var(--neutral); border-color: #fde68a; background: #fffbeb; }
+
+    .chart-wrap {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      padding: 16px;
+    }
+
+    .chart-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .chart-title h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: #334155;
+      justify-content: flex-end;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    canvas {
+      width: 100%;
+      height: 370px;
+      display: block;
+    }
+
+    .table-wrap {
+      margin-top: 18px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.48;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    code {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 2px 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .beta-section {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 430px 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .beta-result {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .footer-note {
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 1040px) {
+      .grid, .beta-section { grid-template-columns: 1fr; }
+      .results, .beta-result { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 640px) {
+      .container { width: min(100% - 20px, 1280px); }
+      .input-grid { grid-template-columns: 1fr; }
+      .results, .beta-result { grid-template-columns: 1fr; }
+      .row { flex-direction: column; align-items: stretch; }
+      .chart-title { flex-direction: column; }
+      .legend { justify-content: flex-start; }
+      canvas { height: 330px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <h1>롱/숏 Kelly 공식 기반 주식 비중 계산기</h1>
+    <p>
+      상승확률·상승률·하락률을 입력하면 Kelly 최적 포지션을 계산합니다.
+      결과가 양수면 롱, 음수면 숏으로 해석하며, 반복 투자 시 예상 복리 수익률과 금액을 그래프로 확인할 수 있습니다.
+    </p>
+  </header>
+
+  <main class="container">
+    <section class="grid">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>1. 기본 입력값</h2>
+          <p>이 앱은 “기초자산 가격이 상승/하락하는 시나리오” 기준입니다. 음수 비중은 숏 포지션입니다.</p>
+        </div>
+        <div class="panel-body">
+          <div class="input-grid">
+            <div class="field full">
+              <label for="capital">총 투자금</label>
+              <input id="capital" type="number" min="0" step="100000" value="51200000" />
+              <div class="hint">예: 51,200,000원</div>
+            </div>
+
+            <div class="field">
+              <label for="upProb">상승확률 (%)</label>
+              <input id="upProb" type="number" min="0" max="100" step="0.1" value="35" />
+              <div class="hint">주가가 상승 시나리오로 갈 확률</div>
+            </div>
+
+            <div class="field">
+              <label for="upMove">상승 시 상승률 (%)</label>
+              <input id="upMove" type="number" min="0.01" step="0.1" value="7" />
+              <div class="hint">숏 입장에서는 손실률로 작용</div>
+            </div>
+
+            <div class="field">
+              <label for="downMove">하락 시 하락률 (%)</label>
+              <input id="downMove" type="number" min="0.01" step="0.1" value="4" />
+              <div class="hint">숏 입장에서는 수익률로 작용</div>
+            </div>
+
+            <div class="field">
+              <label for="rounds">투자 횟수</label>
+              <input id="rounds" type="number" min="1" max="1000" step="1" value="20" />
+            </div>
+
+            <div class="field">
+              <label for="fractionalKelly">Fractional Kelly 적용률 (%)</label>
+              <input id="fractionalKelly" type="number" min="0" max="200" step="5" value="50" />
+              <div class="hint">실전에서는 추정오차를 줄이기 위해 25~50% Kelly를 많이 봅니다.</div>
+            </div>
+
+            <div class="field">
+              <label for="customWeight">비교용 직접 포지션 (%)</label>
+              <input id="customWeight" type="number" min="-1000" max="1000" step="1" value="-30" />
+              <div class="hint">양수 = 롱, 음수 = 숏</div>
+            </div>
+
+            <div class="field">
+              <label for="maxLongWeight">최대 롱 비중 (%)</label>
+              <input id="maxLongWeight" type="number" min="0" max="1000" step="1" value="200" />
+            </div>
+
+            <div class="field">
+              <label for="maxShortWeight">최대 숏 비중 (%)</label>
+              <input id="maxShortWeight" type="number" min="0" max="1000" step="1" value="100" />
+              <div class="hint">100 입력 시 최대 -100%까지 숏 가능</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <label class="toggle" for="allowLeverageShort">
+              <input id="allowLeverageShort" type="checkbox" checked />
+              레버리지·숏 포지션 허용
+            </label>
+            <button id="resetButton" class="secondary" type="button">숏 예시값 초기화</button>
+          </div>
+
+          <div class="notice">
+            중요한 해석: 기존처럼 “내 투자 아이디어의 승률”을 넣는 방식에서 Kelly가 음수라면, 그것은 곧바로 숏이 아니라 “그 아이디어는 하지 말라”는 뜻일 수 있습니다.
+            이 앱에서 음수 Kelly를 숏으로 해석하려면 입력값을 반드시 <b>기초자산의 상승확률·상승폭·하락폭</b> 기준으로 넣어야 합니다.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>2. 롱/숏 계산 결과</h2>
+          <p>공식은 부호가 있는 Kelly입니다. 양수는 롱, 음수는 숏, 0 근처는 관망으로 표시합니다.</p>
+        </div>
+        <div class="panel-body">
+          <div class="results">
+            <div class="metric highlight" id="rawKellyCard">
+              <div class="name">Signed Raw Kelly</div>
+              <div class="value" id="rawKellyValue">-</div>
+              <div class="desc" id="rawKellyDesc">공식상 최적 포지션</div>
+            </div>
+            <div class="metric" id="appliedKellyCard">
+              <div class="name">적용 포지션</div>
+              <div class="value" id="appliedKellyValue">-</div>
+              <div class="desc" id="directionDesc">Fractional Kelly와 한도 반영</div>
+            </div>
+            <div class="metric">
+              <div class="name">필요 포지션 금액</div>
+              <div class="value" id="positionAmountValue">-</div>
+              <div class="desc" id="positionAmountDesc">총 투자금 × 포지션 절대값</div>
+            </div>
+            <div class="metric" id="terminalCard">
+              <div class="name">예상 최종금액</div>
+              <div class="value" id="terminalWealthValue">-</div>
+              <div class="desc" id="terminalDesc">-</div>
+            </div>
+          </div>
+
+          <div class="chart-wrap">
+            <div class="chart-title">
+              <div>
+                <h3>투자 횟수별 예상 복리 수익률</h3>
+                <div class="hint">롱·숏 모두 동일한 로그성장률 공식으로 계산합니다. 유효하지 않은 과도한 숏/레버리지는 자동 제외됩니다.</div>
+              </div>
+              <div class="legend" id="chartLegend"></div>
+            </div>
+            <canvas id="growthChart" width="1000" height="430"></canvas>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>항목</th>
+                  <th>공식</th>
+                  <th>현재 입력값 기준 해석</th>
+                </tr>
+              </thead>
+              <tbody id="formulaTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="beta-section">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>3. 부가기능: 목표 베타 한도</h2>
+          <p>이전의 “베타 제곱으로 무조건 나누기”보다, 목표 포트폴리오 베타를 정하고 포지션 한도를 계산하는 방식입니다.</p>
+        </div>
+        <div class="panel-body">
+          <div class="input-grid">
+            <div class="field">
+              <label for="baseBeta">100% 롱 기준 기초 베타</label>
+              <input id="baseBeta" type="number" min="-10" max="10" step="0.05" value="1.5" />
+              <div class="hint">숏이면 유효 베타는 포지션 부호에 따라 음수가 됩니다.</div>
+            </div>
+            <div class="field">
+              <label for="targetAbsBeta">목표 최대 절대 베타</label>
+              <input id="targetAbsBeta" type="number" min="0" max="20" step="0.1" value="3" />
+              <div class="hint">예: 3이면 |포트폴리오 베타|를 3 이내로 제한</div>
+            </div>
+            <div class="field full">
+              <label for="betaSafetyFactor">베타 안전계수</label>
+              <input id="betaSafetyFactor" type="number" min="0.1" max="10" step="0.1" value="1" />
+              <div class="hint">1.0 = 목표 베타 그대로, 1.5 = 더 보수적으로 목표 한도를 1/1.5만큼 축소</div>
+            </div>
+          </div>
+
+          <div class="notice blue-note">
+            베타 한도 공식은 <code>베타 한도 비중 = 목표 절대 베타 / (|기초 베타| × 안전계수)</code>입니다.
+            최종 포지션은 <code>min/max</code> 방식으로 Kelly 포지션을 이 한도 안에 넣습니다.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>4. 베타 한도 적용 결과</h2>
+          <p>최종 포지션의 유효 베타는 <code>기초 베타 × 포지션 비중</code>으로 계산합니다.</p>
+        </div>
+        <div class="panel-body">
+          <div class="beta-result">
+            <div class="metric highlight" id="betaCappedCard">
+              <div class="name">Beta-capped Kelly</div>
+              <div class="value" id="betaCappedValue">-</div>
+              <div class="desc" id="betaCappedDesc">목표 베타 한도 반영</div>
+            </div>
+            <div class="metric" id="effectiveBetaCard">
+              <div class="name">유효 포트폴리오 베타</div>
+              <div class="value" id="effectiveBetaValue">-</div>
+              <div class="desc">기초 베타 × 최종 포지션</div>
+            </div>
+            <div class="metric">
+              <div class="name">베타 한도 포지션 금액</div>
+              <div class="value" id="betaPositionAmountValue">-</div>
+              <div class="desc">총 투자금 × 포지션 절대값</div>
+            </div>
+            <div class="metric" id="betaTerminalCard">
+              <div class="name">베타 한도 최종금액</div>
+              <div class="value" id="betaTerminalWealthValue">-</div>
+              <div class="desc" id="betaTerminalDesc">-</div>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>계산값</th>
+                  <th>해석</th>
+                </tr>
+              </thead>
+              <tbody id="betaTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      이 도구는 학습·시뮬레이션 목적입니다. 실제 숏 포지션은 대차비용, 증거금, 강제청산, 숏스퀴즈, 상방 갭 리스크가 있으며 손실이 매우 커질 수 있습니다.
+    </div>
+  </main>
+
+  <script>
+    const inputs = {
+      capital: document.getElementById('capital'),
+      upProb: document.getElementById('upProb'),
+      upMove: document.getElementById('upMove'),
+      downMove: document.getElementById('downMove'),
+      rounds: document.getElementById('rounds'),
+      fractionalKelly: document.getElementById('fractionalKelly'),
+      customWeight: document.getElementById('customWeight'),
+      maxLongWeight: document.getElementById('maxLongWeight'),
+      maxShortWeight: document.getElementById('maxShortWeight'),
+      allowLeverageShort: document.getElementById('allowLeverageShort'),
+      baseBeta: document.getElementById('baseBeta'),
+      targetAbsBeta: document.getElementById('targetAbsBeta'),
+      betaSafetyFactor: document.getElementById('betaSafetyFactor')
+    };
+
+    const els = {
+      rawKellyValue: document.getElementById('rawKellyValue'),
+      rawKellyDesc: document.getElementById('rawKellyDesc'),
+      appliedKellyValue: document.getElementById('appliedKellyValue'),
+      directionDesc: document.getElementById('directionDesc'),
+      positionAmountValue: document.getElementById('positionAmountValue'),
+      positionAmountDesc: document.getElementById('positionAmountDesc'),
+      terminalWealthValue: document.getElementById('terminalWealthValue'),
+      terminalDesc: document.getElementById('terminalDesc'),
+      formulaTable: document.getElementById('formulaTable'),
+      chartLegend: document.getElementById('chartLegend'),
+      rawKellyCard: document.getElementById('rawKellyCard'),
+      appliedKellyCard: document.getElementById('appliedKellyCard'),
+      terminalCard: document.getElementById('terminalCard'),
+      betaCappedValue: document.getElementById('betaCappedValue'),
+      betaCappedDesc: document.getElementById('betaCappedDesc'),
+      effectiveBetaValue: document.getElementById('effectiveBetaValue'),
+      betaPositionAmountValue: document.getElementById('betaPositionAmountValue'),
+      betaTerminalWealthValue: document.getElementById('betaTerminalWealthValue'),
+      betaTerminalDesc: document.getElementById('betaTerminalDesc'),
+      betaTable: document.getElementById('betaTable'),
+      betaCappedCard: document.getElementById('betaCappedCard'),
+      effectiveBetaCard: document.getElementById('effectiveBetaCard'),
+      betaTerminalCard: document.getElementById('betaTerminalCard')
+    };
+
+    const canvas = document.getElementById('growthChart');
+    const ctx = canvas.getContext('2d');
+    const colors = ['#2563eb', '#0f766e', '#f59e0b', '#dc2626', '#7c3aed'];
+
+    function numberValue(input, fallback = 0) {
+      const value = Number(input.value);
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function formatPercent(value, digits = 1) {
+      if (!Number.isFinite(value)) return '-';
+      return `${(value * 100).toFixed(digits)}%`;
+    }
+
+    function formatSignedPercent(value, digits = 1) {
+      if (!Number.isFinite(value)) return '-';
+      const sign = value > 0 ? '+' : '';
+      return `${sign}${(value * 100).toFixed(digits)}%`;
+    }
+
+    function formatWon(value) {
+      if (!Number.isFinite(value)) return '-';
+      return new Intl.NumberFormat('ko-KR', {
+        style: 'currency',
+        currency: 'KRW',
+        maximumFractionDigits: 0
+      }).format(value);
+    }
+
+    function formatNumber(value, digits = 3) {
+      if (!Number.isFinite(value)) return '-';
+      return Number(value).toFixed(digits);
+    }
+
+    function directionText(f) {
+      if (!Number.isFinite(f) || Math.abs(f) < 0.000001) return '관망';
+      return f > 0 ? '롱' : '숏';
+    }
+
+    function setCardState(card, value) {
+      card.classList.remove('long', 'short', 'neutral');
+      if (!Number.isFinite(value) || Math.abs(value) < 0.000001) card.classList.add('neutral');
+      else if (value > 0) card.classList.add('long');
+      else card.classList.add('short');
+    }
+
+    function setReturnState(card, value) {
+      card.classList.remove('long', 'short', 'neutral');
+      if (!Number.isFinite(value) || Math.abs(value) < 0.000001) card.classList.add('neutral');
+      else if (value > 0) card.classList.add('long');
+      else card.classList.add('short');
+    }
+
+    function signedKelly(p, up, q, down) {
+      return (p * up - q * down) / (up * down);
+    }
+
+    function logGrowth(f, p, up, q, down) {
+      const upMultiplier = 1 + f * up;
+      const downMultiplier = 1 - f * down;
+      if (upMultiplier <= 0 || downMultiplier <= 0) return NaN;
+      return p * Math.log(upMultiplier) + q * Math.log(downMultiplier);
+    }
+
+    function terminalWealth(capital, growth, rounds) {
+      if (!Number.isFinite(growth)) return NaN;
+      return capital * Math.exp(rounds * growth);
+    }
+
+    function capSignedWeight(f, minShort, maxLong) {
+      return clamp(f, -minShort, maxLong);
+    }
+
+    function buildSeries(label, fraction, capital, rounds, p, up, q, down) {
+      const growth = logGrowth(fraction, p, up, q, down);
+      const data = [];
+      for (let i = 0; i <= rounds; i += 1) {
+        const wealth = Number.isFinite(growth) ? terminalWealth(capital, growth, i) : NaN;
+        data.push({ x: i, y: Number.isFinite(wealth) ? ((wealth / capital) - 1) * 100 : NaN });
+      }
+      return { label, fraction, growth, data };
+    }
+
+    function drawChart(seriesList, rounds) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const padding = { left: 68, right: 22, top: 22, bottom: 48 };
+      const width = rect.width - padding.left - padding.right;
+      const height = rect.height - padding.top - padding.bottom;
+
+      const validValues = seriesList.flatMap(s => s.data.map(d => d.y)).filter(Number.isFinite);
+      let minY = Math.min(0, ...validValues);
+      let maxY = Math.max(0, ...validValues);
+      if (Math.abs(maxY - minY) < 1) {
+        maxY += 1;
+        minY -= 1;
+      }
+      const yPadding = (maxY - minY) * 0.12;
+      minY -= yPadding;
+      maxY += yPadding;
+
+      function xScale(x) {
+        return padding.left + (x / Math.max(rounds, 1)) * width;
+      }
+
+      function yScale(y) {
+        return padding.top + (maxY - y) / (maxY - minY) * height;
+      }
+
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 1;
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      const yTicks = 5;
+      for (let i = 0; i <= yTicks; i += 1) {
+        const yVal = minY + ((maxY - minY) / yTicks) * i;
+        const y = yScale(yVal);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + width, y);
+        ctx.stroke();
+        ctx.fillText(`${yVal.toFixed(0)}%`, padding.left - 10, y);
+      }
+
+      const zeroY = yScale(0);
+      if (zeroY >= padding.top && zeroY <= padding.top + height) {
+        ctx.strokeStyle = '#94a3b8';
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, zeroY);
+        ctx.lineTo(padding.left + width, zeroY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      const xTicks = Math.min(10, rounds);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (let i = 0; i <= xTicks; i += 1) {
+        const xVal = Math.round((rounds / xTicks) * i);
+        const x = xScale(xVal);
+        ctx.strokeStyle = '#eef2f7';
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, padding.top + height);
+        ctx.stroke();
+        ctx.fillStyle = '#64748b';
+        ctx.fillText(String(xVal), x, padding.top + height + 12);
+      }
+
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top + height);
+      ctx.lineTo(padding.left + width, padding.top + height);
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + height);
+      ctx.stroke();
+
+      ctx.fillStyle = '#334155';
+      ctx.font = '12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('투자 횟수', padding.left + width / 2, rect.height - 16);
+
+      ctx.save();
+      ctx.translate(18, padding.top + height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.fillText('누적 수익률', 0, 0);
+      ctx.restore();
+
+      seriesList.forEach((series, index) => {
+        const color = colors[index % colors.length];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        let started = false;
+        series.data.forEach(point => {
+          if (!Number.isFinite(point.y)) return;
+          const x = xScale(point.x);
+          const y = yScale(point.y);
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+
+        const last = series.data[series.data.length - 1];
+        if (last && Number.isFinite(last.y)) {
+          const x = xScale(last.x);
+          const y = yScale(last.y);
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
+
+    function renderLegend(seriesList) {
+      els.chartLegend.innerHTML = seriesList.map((series, index) => `
+        <span><i class="dot" style="background:${colors[index % colors.length]}"></i>${series.label} (${formatSignedPercent(series.fraction)})</span>
+      `).join('');
+    }
+
+    function calculate() {
+      const capital = Math.max(0, numberValue(inputs.capital, 0));
+      const p = clamp(numberValue(inputs.upProb, 0) / 100, 0, 1);
+      const q = 1 - p;
+      const up = Math.max(0.000001, numberValue(inputs.upMove, 0) / 100);
+      const down = Math.max(0.000001, numberValue(inputs.downMove, 0) / 100);
+      const rounds = Math.max(1, Math.round(numberValue(inputs.rounds, 1)));
+      const fractionalRate = Math.max(0, numberValue(inputs.fractionalKelly, 0) / 100);
+      const customWeight = numberValue(inputs.customWeight, 0) / 100;
+      const allowLeverageShort = inputs.allowLeverageShort.checked;
+      const inputMaxLong = Math.max(0, numberValue(inputs.maxLongWeight, 100) / 100);
+      const inputMaxShort = Math.max(0, numberValue(inputs.maxShortWeight, 100) / 100);
+      const baseBeta = numberValue(inputs.baseBeta, 1);
+      const targetAbsBeta = Math.max(0, numberValue(inputs.targetAbsBeta, 0));
+      const betaSafetyFactor = Math.max(0.1, numberValue(inputs.betaSafetyFactor, 1));
+
+      const survivalMaxLong = 0.999 / down;
+      const survivalMaxShort = 0.999 / up;
+      const maxLong = allowLeverageShort ? Math.min(inputMaxLong, survivalMaxLong) : Math.min(inputMaxLong, 1);
+      const maxShort = allowLeverageShort ? Math.min(inputMaxShort, survivalMaxShort) : 0;
+
+      const rawKelly = signedKelly(p, up, q, down);
+      const appliedKelly = capSignedWeight(rawKelly * fractionalRate, maxShort, maxLong);
+      const quarterKelly = capSignedWeight(rawKelly * 0.25, maxShort, maxLong);
+      const halfKelly = capSignedWeight(rawKelly * 0.5, maxShort, maxLong);
+      const fullKelly = capSignedWeight(rawKelly, maxShort, maxLong);
+      const customCapped = capSignedWeight(customWeight, maxShort, maxLong);
+
+      const betaCapAbs = Math.abs(baseBeta) < 0.000001 ? maxLong : targetAbsBeta / (Math.abs(baseBeta) * betaSafetyFactor);
+      const betaCap = Math.min(betaCapAbs, Math.max(maxLong, maxShort));
+      const betaCappedKelly = capSignedWeight(appliedKelly, Math.min(maxShort, betaCap), Math.min(maxLong, betaCap));
+      const effectiveBeta = baseBeta * betaCappedKelly;
+
+      const appliedGrowth = logGrowth(appliedKelly, p, up, q, down);
+      const appliedTerminal = terminalWealth(capital, appliedGrowth, rounds);
+      const betaGrowth = logGrowth(betaCappedKelly, p, up, q, down);
+      const betaTerminal = terminalWealth(capital, betaGrowth, rounds);
+      const positionAmount = capital * Math.abs(appliedKelly);
+      const betaPositionAmount = capital * Math.abs(betaCappedKelly);
+      const longEdge = p * up - q * down;
+      const shortEdge = q * down - p * up;
+      const breakEvenUpProb = down / (up + down);
+
+      els.rawKellyValue.textContent = formatSignedPercent(rawKelly);
+      els.rawKellyDesc.innerHTML = `<span class="pill ${rawKelly > 0 ? 'longp' : rawKelly < 0 ? 'shortp' : 'neutralp'}">${directionText(rawKelly)}</span> 공식상 최적 포지션`;
+      els.appliedKellyValue.textContent = formatSignedPercent(appliedKelly);
+      els.directionDesc.innerHTML = `<span class="pill ${appliedKelly > 0 ? 'longp' : appliedKelly < 0 ? 'shortp' : 'neutralp'}">${directionText(appliedKelly)}</span> Fractional Kelly·한도 반영`;
+      els.positionAmountValue.textContent = formatWon(positionAmount);
+      els.positionAmountDesc.textContent = `${directionText(appliedKelly)} 포지션 명목금액`;
+      els.terminalWealthValue.textContent = formatWon(appliedTerminal);
+      els.terminalDesc.textContent = `누적 수익률 ${formatPercent(appliedTerminal / capital - 1)} · ${rounds}회 기준`;
+
+      els.betaCappedValue.textContent = formatSignedPercent(betaCappedKelly);
+      els.betaCappedDesc.innerHTML = `<span class="pill ${betaCappedKelly > 0 ? 'longp' : betaCappedKelly < 0 ? 'shortp' : 'neutralp'}">${directionText(betaCappedKelly)}</span> 목표 베타 한도 반영`;
+      els.effectiveBetaValue.textContent = formatNumber(effectiveBeta, 2);
+      els.betaPositionAmountValue.textContent = formatWon(betaPositionAmount);
+      els.betaTerminalWealthValue.textContent = formatWon(betaTerminal);
+      els.betaTerminalDesc.textContent = `누적 수익률 ${formatPercent(betaTerminal / capital - 1)} · ${rounds}회 기준`;
+
+      setCardState(els.rawKellyCard, rawKelly);
+      setCardState(els.appliedKellyCard, appliedKelly);
+      setReturnState(els.terminalCard, appliedTerminal / capital - 1);
+      setCardState(els.betaCappedCard, betaCappedKelly);
+      setCardState(els.effectiveBetaCard, effectiveBeta);
+      setReturnState(els.betaTerminalCard, betaTerminal / capital - 1);
+
+      const seriesList = [
+        buildSeries('Quarter Kelly', quarterKelly, capital, rounds, p, up, q, down),
+        buildSeries('Half Kelly', halfKelly, capital, rounds, p, up, q, down),
+        buildSeries('Full Kelly', fullKelly, capital, rounds, p, up, q, down),
+        buildSeries('직접 입력', customCapped, capital, rounds, p, up, q, down),
+        buildSeries('Beta 한도', betaCappedKelly, capital, rounds, p, up, q, down)
+      ];
+
+      drawChart(seriesList, rounds);
+      renderLegend(seriesList);
+
+      els.formulaTable.innerHTML = `
+        <tr>
+          <td><b>상승/하락 시나리오</b></td>
+          <td><code>R = +U with p, R = -D with q</code></td>
+          <td>상승확률 <b>${formatPercent(p)}</b>, 하락확률 <b>${formatPercent(q)}</b>, 상승률 <b>${formatPercent(up)}</b>, 하락률 <b>${formatPercent(down)}</b>입니다.</td>
+        </tr>
+        <tr>
+          <td><b>롱 기대값</b></td>
+          <td><code>E_long = pU - qD</code></td>
+          <td>100% 롱 기준 1회 단순 기대값은 <b>${formatSignedPercent(longEdge)}</b>입니다. 음수이면 롱에는 불리합니다.</td>
+        </tr>
+        <tr>
+          <td><b>숏 기대값</b></td>
+          <td><code>E_short = qD - pU = -E_long</code></td>
+          <td>100% 숏 기준 1회 단순 기대값은 <b>${formatSignedPercent(shortEdge)}</b>입니다. 양수이면 숏에는 유리합니다.</td>
+        </tr>
+        <tr>
+          <td><b>롱/숏 Kelly 최적포지션</b></td>
+          <td><code>f* = (pU - qD) / (U × D)</code></td>
+          <td>현재 Signed Raw Kelly는 <b>${formatSignedPercent(rawKelly)}</b>입니다. 양수면 롱, 음수면 숏입니다.</td>
+        </tr>
+        <tr>
+          <td><b>적용 포지션</b></td>
+          <td><code>f = clamp(f* × Fractional Kelly, -Max Short, Max Long)</code></td>
+          <td>최종 적용 포지션은 <b>${formatSignedPercent(appliedKelly)}</b>, 방향은 <b>${directionText(appliedKelly)}</b>, 명목금액은 <b>${formatWon(positionAmount)}</b>입니다.</td>
+        </tr>
+        <tr>
+          <td><b>생존 가능 포지션 한도</b></td>
+          <td><code>-1/U &lt; f &lt; 1/D</code></td>
+          <td>상승 시 숏 손실, 하락 시 롱 손실 때문에 이론상 생존 한도는 롱 <b>${formatPercent(survivalMaxLong)}</b>, 숏 <b>-${formatPercent(survivalMaxShort).replace('%','')}%</b> 근처입니다.</td>
+        </tr>
+        <tr>
+          <td><b>기하평균 로그성장률</b></td>
+          <td><code>g_log = p ln(1 + fU) + q ln(1 - fD)</code></td>
+          <td>적용 포지션의 1회 기대 로그성장률은 <b>${formatPercent(appliedGrowth, 3)}</b>입니다.</td>
+        </tr>
+        <tr>
+          <td><b>반복 투자 후 금액</b></td>
+          <td><code>W_n = W_0 × exp(n × g_log)</code></td>
+          <td>${rounds}회 반복 시 예상 최종금액은 <b>${formatWon(appliedTerminal)}</b>, 예상 수익금은 <b>${formatWon(appliedTerminal - capital)}</b>입니다.</td>
+        </tr>
+        <tr>
+          <td><b>롱 손익분기 상승확률</b></td>
+          <td><code>D / (U + D)</code></td>
+          <td>현재 손익폭에서 롱이 유리하려면 상승확률이 <b>${formatPercent(breakEvenUpProb)}</b> 이상이어야 합니다. 이보다 낮으면 숏 Kelly가 나올 수 있습니다.</td>
+        </tr>
+      `;
+
+      const betaLimitPosition = Math.abs(baseBeta) < 0.000001 ? Infinity : targetAbsBeta / (Math.abs(baseBeta) * betaSafetyFactor);
+      els.betaTable.innerHTML = `
+        <tr>
+          <td><b>베타 한도 공식</b></td>
+          <td><code>f_beta_limit = Target |β| / (|Base β| × Safety)</code></td>
+          <td>기초 베타를 기준으로 포지션 절대값의 상한을 계산합니다.</td>
+        </tr>
+        <tr>
+          <td><b>베타 한도 비중</b></td>
+          <td><b>${Number.isFinite(betaLimitPosition) ? formatPercent(betaLimitPosition) : '무제한'}</b></td>
+          <td>목표 절대 베타 <b>${formatNumber(targetAbsBeta, 2)}</b>, 기초 베타 <b>${formatNumber(baseBeta, 2)}</b>, 안전계수 <b>${formatNumber(betaSafetyFactor, 2)}</b>를 적용했습니다.</td>
+        </tr>
+        <tr>
+          <td><b>베타 한도 적용 포지션</b></td>
+          <td><b>${formatSignedPercent(betaCappedKelly)}</b></td>
+          <td>Kelly 적용 포지션 <b>${formatSignedPercent(appliedKelly)}</b>을 베타 한도 안으로 제한했습니다. 방향은 <b>${directionText(betaCappedKelly)}</b>입니다.</td>
+        </tr>
+        <tr>
+          <td><b>유효 포트폴리오 베타</b></td>
+          <td><code>Base β × f</code> = <b>${formatNumber(effectiveBeta, 2)}</b></td>
+          <td>숏 포지션이면 유효 베타가 음수로 전환될 수 있습니다. 예: 베타 1.5 종목을 -100% 숏하면 유효 베타는 -1.5입니다.</td>
+        </tr>
+        <tr>
+          <td><b>베타 한도 반복 결과</b></td>
+          <td><code>W_n = W_0 × exp(n × g_log(f_beta))</code></td>
+          <td>${rounds}회 반복 시 예상 최종금액은 <b>${formatWon(betaTerminal)}</b>, 예상 수익금은 <b>${formatWon(betaTerminal - capital)}</b>입니다.</td>
+        </tr>
+      `;
+    }
+
+    Object.values(inputs).forEach(input => {
+      input.addEventListener('input', calculate);
+      input.addEventListener('change', calculate);
+    });
+
+    document.getElementById('resetButton').addEventListener('click', () => {
+      inputs.capital.value = 51200000;
+      inputs.upProb.value = 35;
+      inputs.upMove.value = 7;
+      inputs.downMove.value = 4;
+      inputs.rounds.value = 20;
+      inputs.fractionalKelly.value = 50;
+      inputs.customWeight.value = -30;
+      inputs.maxLongWeight.value = 200;
+      inputs.maxShortWeight.value = 100;
+      inputs.allowLeverageShort.checked = true;
+      inputs.baseBeta.value = 1.5;
+      inputs.targetAbsBeta.value = 3;
+      inputs.betaSafetyFactor.value = 1;
+      calculate();
+    });
+
+    window.addEventListener('resize', calculate);
+    calculate();
+  </script>
+</body>
+</html>
